@@ -3,24 +3,23 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.animation import FuncAnimation
 
-# Target function with two equal peaks
 def f(x, y):
     return (
-        np.exp(-((x + 3)**2 + (y - 3)**2))  # Peak at (-3,  3)
-        + np.exp(-((x - 3)**2 + (y + 3)**2))  # Peak at ( 3, -3)
+        np.exp(-((x + 3)**2 + (y - 3)**2)) +
+        np.exp(-((x - 3)**2 + (y + 3)**2))
     )
 
-# EA parameters
 pop_size        = 300
-num_generations = 50
-mutation_rate   = 0.01
-crossover_rate  = 0.7
+num_generations = 500
+mutation_prob   = 0.2
+mutation_scale  = 0.4
+crossover_rate  = 0
+accept_worse_prob = 0.05  # 5% chance to accept worse solutions
+random_restart_prob = 0.01  # small chance to introduce diversity
 
-# Initialize population and history
 population  = np.random.uniform(-4, 4, size=(pop_size, 2))
 pop_history = [population.copy()]
 
-# Deterministic crowding reproduction + replacement
 for gen in range(num_generations):
     idxs = np.random.permutation(pop_size)
     new_pop = population.copy()
@@ -37,10 +36,17 @@ for gen in range(num_generations):
             c1, c2 = p1.copy(), p2.copy()
 
         # mutation
-        if np.random.rand() < mutation_rate:
-            c1 += np.random.normal(scale=0.5, size=2)
-        if np.random.rand() < mutation_rate:
-            c2 += np.random.normal(scale=0.5, size=2)
+        if np.random.rand() < mutation_prob:
+            c1 += np.random.normal(scale=mutation_scale, size=2)
+        if np.random.rand() < mutation_prob:
+            c2 += np.random.normal(scale=mutation_scale, size=2)
+
+        # random reinitialization
+        if np.random.rand() < random_restart_prob:
+            c1 = np.random.uniform(-4, 4, size=2)
+        if np.random.rand() < random_restart_prob:
+            c2 = np.random.uniform(-4, 4, size=2)
+
         c1 = np.clip(c1, -4, 4)
         c2 = np.clip(c2, -4, 4)
 
@@ -52,76 +58,48 @@ for gen in range(num_generations):
         else:
             pairs = [(i1, p1, c2), (i2, p2, c1)]
 
-        # replacement
+        # replacement with occasional acceptance of worse solutions
         for idx, parent, child in pairs:
-            if f(child[0], child[1]) > f(parent[0], parent[1]):
+            fp, fc = f(parent[0], parent[1]), f(child[0], child[1])
+            if fc > fp or np.random.rand() < accept_worse_prob:
                 new_pop[idx] = child
 
     population = new_pop
     pop_history.append(population.copy())
 
-# Prepare mesh for plotting
+# Plotting 
 xv = np.linspace(-4, 4, 200)
 yv = np.linspace(-4, 4, 200)
 X, Y = np.meshgrid(xv, yv)
-Z    = f(X, Y)
+Z = f(X, Y)
 
 fig = plt.figure(figsize=(14, 6))
-
-# 3D surface with plasma colormap
 ax1 = fig.add_subplot(121, projection='3d')
-surf = ax1.plot_surface(
-    X, Y, Z,
-    rstride=5, cstride=5,
-    linewidth=0.1, alpha=0.8,
-    cmap='plasma'     # purple→yellow gradient
-)
-ax1.set_xlabel('X')
-ax1.set_ylabel('Y')
-ax1.set_zlabel('f(x,y)')
-ax1.set_title('3D Surface — EA with Deterministic Crowding')
+surf = ax1.plot_surface(X, Y, Z, rstride=5, cstride=5, linewidth=0.1, alpha=0.8, cmap='plasma')
+ax1.set_xlabel('X'); ax1.set_ylabel('Y'); ax1.set_zlabel('f(x,y)')
+ax1.set_title('3D Surface — EA with Escape Strategy')
 fig.colorbar(surf, ax=ax1, shrink=0.5, aspect=10)
 
-# 2D contour with plasma colormap
 ax2 = fig.add_subplot(122)
-cont = ax2.contourf(
-    X, Y, Z,
-    levels=50,
-    cmap='plasma'     # match the 3D plot
-)
-ax2.set_xlabel('X')
-ax2.set_ylabel('Y')
-ax2.set_title('2D Contour — EA with Deterministic Crowding')
+cont = ax2.contourf(X, Y, Z, levels=50, cmap='plasma')
+ax2.set_xlabel('X'); ax2.set_ylabel('Y')
+ax2.set_title('2D Contour — EA with Escape Strategy')
 fig.colorbar(cont, ax=ax2)
 
-# Initial scatter (all dots in red)
 init = pop_history[0]
-scat3d = ax1.scatter(
-    init[:,0], init[:,1], f(init[:,0], init[:,1]),
-    c='red', s=20
-)
-scat2d = ax2.scatter(
-    init[:,0], init[:,1],
-    c='red', s=20
-)
+scat3d = ax1.scatter(init[:,0], init[:,1], f(init[:,0], init[:,1]), c='red', s=20)
+scat2d = ax2.scatter(init[:,0], init[:,1], c='red', s=20)
 
-# Animation update (400 ms/frame)
 def update(frame):
     pop = pop_history[frame]
     x, y = pop[:,0], pop[:,1]
-    z    = f(x, y)
+    z = f(x, y)
     scat3d._offsets3d = (x, y, z)
     scat2d.set_offsets(np.c_[x, y])
     ax1.set_title(f'3D Surface — Generation {frame}')
     ax2.set_title(f'2D Contour — Generation {frame}')
     return scat3d, scat2d
 
-ani = FuncAnimation(
-    fig, update,
-    frames=len(pop_history),
-    interval=400,   # slowed by half
-    blit=False
-)
-
+ani = FuncAnimation(fig, update, frames=len(pop_history), interval=50, blit=False)
 plt.tight_layout()
 plt.show()
