@@ -5,8 +5,13 @@ from matplotlib.animation import FuncAnimation
 
 def f(x, y):
     return (
-        np.exp(-((x + 3)**2 + (y - 3)**2)) +
-        np.exp(-((x - 3)**2 + (y + 3)**2))
+        np.exp(-((x + 3)**2 + (y - 3)**2)) +  # peak
+        np.exp(-((x - 3)**2 + (y + 3)**2)) +  
+        np.exp(-((x - 3)**2 + (y - 3)**2)) +  
+        np.exp(-((x + 3)**2 + (y + 3)**2)) +
+        np.exp(-((x)**2 + (y)**2))
+        
+           
     )
 
 pop_size        = 300
